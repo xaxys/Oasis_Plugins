@@ -55,11 +55,13 @@ func (p *TimelyTaskPlugin) UpdateTask() {
 	}
 	for _, task := range taskList {
 		commands := strings.Join(task.Commands, ";")
+		dir := task.Dir
 		p.GetServer().RegisterTask(p.GetPlugin(), task.Time, FuncRunnable(func() {
 			cmd := exec.Command("/bin/sh", "-c", commands)
-			cmd.Dir = task.Dir
+			cmd.Dir = dir
+			p.GetLogger().Debugf("Running task commands \"%s\" at %s", commands, cmd.Dir)
 			stdout, stderr, err := execCommand(cmd)
-			if task.Print {
+			if task.Print && stdout != "" {
 				p.GetLogger().Info(stdout)
 			}
 			if stderr != "" {
@@ -68,6 +70,7 @@ func (p *TimelyTaskPlugin) UpdateTask() {
 			if err != nil {
 				p.GetLogger().Error(err)
 			}
+			p.GetLogger().Debugf("Finished running task commands \"%s\" at %s", commands, cmd.Dir)
 		}))
 	}
 	p.GetLogger().Infof("Task updated, applied %d tasks.", len(taskList))
@@ -78,7 +81,6 @@ func execCommand(cmd *exec.Cmd) (string, string, error) {
 	var errBuffer bytes.Buffer
 	cmd.Stdout = &outBuffer
 	cmd.Stderr = &errBuffer
-	cmd.Start()
-	err := cmd.Wait()
+	err := cmd.Run()
 	return outBuffer.String(), errBuffer.String(), err
 }
